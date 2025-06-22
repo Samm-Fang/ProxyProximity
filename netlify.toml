@@ -1,14 +1,9 @@
 [build]
-  # The directory to publish, which contains your index.html
   publish = "."
-  # The directory where your serverless functions are located
   functions = "netlify/functions"
 
-# Redirect rule for the API proxy
 [[redirects]]
-  # All requests to /api/... will be handled by the proxy function
   from = "/api/*"
-  # Forward the path after /api/ as a 'path' query parameter
-  to = "/.netlify/functions/proxy?path=:splat"
-  # Rewrite the request to the function without a browser redirect
+  to = "/.netlify/functions/proxy"
   status = 200
+  force = true

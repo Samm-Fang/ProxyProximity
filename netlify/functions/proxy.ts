@@ -42,35 +42,40 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    // Extract the target path from the 'path' query parameter, which is populated by the rewrite rule.
-    const targetPath = event.queryStringParameters?.['path'];
-    if (!targetPath) {
+    // The rewrite rule `from = "/api/*"` forwards the path to the function.
+    // We need to strip the `/api/` prefix from the event path.
+    // e.g., /api/generativelanguage.googleapis.com/v1 -> generativelanguage.googleapis.com/v1
+    const path = event.path;
+    if (!path.startsWith('/api/')) {
         return {
             statusCode: 400,
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             body: JSON.stringify({
-                error: "Target path not provided. The URL should be /api/[target-path]"
+                error: "Invalid API proxy URL format. Expected format: /api/[target-domain]/..."
             }),
         };
     }
 
+    // Remove the '/api/' prefix
+    const targetPath = path.substring(5);
     const pathSegments = targetPath.split('/').filter(segment => segment.length > 0);
+    
+    if (pathSegments.length < 1) {
+        return {
+            statusCode: 400,
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: JSON.stringify({
+                error: "Invalid API proxy URL format. Target domain is missing."
+            }),
+        };
+    }
+
     let targetDomain = pathSegments[0];
     targetDomain = targetDomain.replace(/^https?:\/\//, '');
     const remainingPath = pathSegments.slice(1).join('/');
     
     const targetBaseUrl = `https://${targetDomain}`;
-
-    // Reconstruct the query string, excluding the 'path' parameter used for routing.
-    const params = new URLSearchParams();
-    if (event.queryStringParameters) {
-        for (const [key, value] of Object.entries(event.queryStringParameters)) {
-            if (key !== 'path' && value) {
-                params.set(key, value);
-            }
-        }
-    }
-    const queryString = params.toString();
+    const queryString = new URLSearchParams(event.queryStringParameters as Record<string, string> || {}).toString();
     const targetUrl = new URL(`${targetBaseUrl}/${remainingPath}${queryString ? '?' + queryString : ''}`);
 
     // Prepare headers for forwarding, removing client-specific auth headers.
