@@ -8,8 +8,7 @@
 [[redirects]]
   # All requests to /api/... will be handled by the proxy function
   from = "/api/*"
-  to = "/.netlify/functions/proxy"
+  # Forward the path after /api/ as a 'path' query parameter
+  to = "/.netlify/functions/proxy?path=:splat"
   # Rewrite the request to the function without a browser redirect
   status = 200
-  # Ensure this rule is applied even if a file exists at the path
-  force = true

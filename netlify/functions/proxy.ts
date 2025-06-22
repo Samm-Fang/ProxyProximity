@@ -42,38 +42,35 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    // Extract the target API domain and path from the request path based on the rewrite rule.
-    // e.g., a request to /api/generativelanguage.googleapis.com/v1beta/models
-    // will have an event.path of /api/generativelanguage.googleapis.com/v1beta/models
-    const pathSegments = event.path.split('/').filter(segment => segment.length > 0);
-    
-    // After the `/api/` rewrite, the first segment should be 'api'.
-    const apiPathIndex = pathSegments.indexOf('api');
-    if (apiPathIndex === -1 || apiPathIndex + 1 >= pathSegments.length) {
+    // Extract the target path from the 'path' query parameter, which is populated by the rewrite rule.
+    const targetPath = event.queryStringParameters?.['path'];
+    if (!targetPath) {
         return {
             statusCode: 400,
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             body: JSON.stringify({
-                error: "Invalid API proxy URL format. Expected format: /api/[target-domain]/..."
+                error: "Target path not provided. The URL should be /api/[target-path]"
             }),
         };
     }
 
-    const targetPathSegments = pathSegments.slice(apiPathIndex + 1);
-    let targetDomain = targetPathSegments[0];
+    const pathSegments = targetPath.split('/').filter(segment => segment.length > 0);
+    let targetDomain = pathSegments[0];
     targetDomain = targetDomain.replace(/^https?:\/\//, '');
-    const remainingPath = targetPathSegments.slice(1).join('/');
+    const remainingPath = pathSegments.slice(1).join('/');
     
     const targetBaseUrl = `https://${targetDomain}`;
-    const params: Record<string, string> = {};
+
+    // Reconstruct the query string, excluding the 'path' parameter used for routing.
+    const params = new URLSearchParams();
     if (event.queryStringParameters) {
         for (const [key, value] of Object.entries(event.queryStringParameters)) {
-            if (value) {
-                params[key] = value;
+            if (key !== 'path' && value) {
+                params.set(key, value);
             }
         }
     }
-    const queryString = new URLSearchParams(params).toString();
+    const queryString = params.toString();
     const targetUrl = new URL(`${targetBaseUrl}/${remainingPath}${queryString ? '?' + queryString : ''}`);
 
     // Prepare headers for forwarding, removing client-specific auth headers.
