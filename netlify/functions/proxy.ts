@@ -17,14 +17,16 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
   // Handle OPTIONS for CORS preflight
   if (httpMethod === "OPTIONS") {
+    const optionsHeaders: Record<string, string | number | boolean> = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Authorization, x-api-key, x-goog-api-key, Content-Type",
+      "Access-Control-Max-Age": 86400,
+    };
     return {
       statusCode: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, x-api-key, x-goog-api-key, Content-Type",
-        "Access-Control-Max-Age": "86400",
-      },
+      headers: optionsHeaders,
+      body: ''
     };
   }
 
@@ -40,28 +42,38 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    // Extract the target API domain and path from the request path.
-    // e.g., /.netlify/functions/proxy/generativelanguage.googleapis.com/v1beta/models
-    // becomes -> generativelanguage.googleapis.com/v1beta/models
+    // Extract the target API domain and path from the request path based on the rewrite rule.
+    // e.g., a request to /api/generativelanguage.googleapis.com/v1beta/models
+    // will have an event.path of /api/generativelanguage.googleapis.com/v1beta/models
     const pathSegments = event.path.split('/').filter(segment => segment.length > 0);
-    const proxyPathIndex = pathSegments.indexOf('proxy');
-    if (proxyPathIndex === -1 || proxyPathIndex + 1 >= pathSegments.length) {
+    
+    // After the `/api/` rewrite, the first segment should be 'api'.
+    const apiPathIndex = pathSegments.indexOf('api');
+    if (apiPathIndex === -1 || apiPathIndex + 1 >= pathSegments.length) {
         return {
             statusCode: 400,
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             body: JSON.stringify({
-                error: "Invalid URL format. Expected format: /.netlify/functions/proxy/[target-domain]/..."
+                error: "Invalid API proxy URL format. Expected format: /api/[target-domain]/..."
             }),
         };
     }
 
-    const targetPathSegments = pathSegments.slice(proxyPathIndex + 1);
+    const targetPathSegments = pathSegments.slice(apiPathIndex + 1);
     let targetDomain = targetPathSegments[0];
     targetDomain = targetDomain.replace(/^https?:\/\//, '');
     const remainingPath = targetPathSegments.slice(1).join('/');
     
     const targetBaseUrl = `https://${targetDomain}`;
-    const queryString = new URLSearchParams(event.queryStringParameters || {}).toString();
+    const params: Record<string, string> = {};
+    if (event.queryStringParameters) {
+        for (const [key, value] of Object.entries(event.queryStringParameters)) {
+            if (value) {
+                params[key] = value;
+            }
+        }
+    }
+    const queryString = new URLSearchParams(params).toString();
     const targetUrl = new URL(`${targetBaseUrl}/${remainingPath}${queryString ? '?' + queryString : ''}`);
 
     // Prepare headers for forwarding, removing client-specific auth headers.
