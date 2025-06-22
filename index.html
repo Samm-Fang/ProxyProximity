@@ -270,7 +270,7 @@
             const isGoogleStyle = cleanBaseUrl.includes('generativelanguage.googleapis.com');
             const isAnthropicStyle = cleanBaseUrl.includes('api.anthropic.com');
             const finalBaseUrl = cleanBaseUrl;
-            const proxyUrl = `${window.location.protocol}//${window.location.host}/${finalBaseUrl}`;
+            const proxyUrl = `${window.location.protocol}//${window.location.host}/api/${finalBaseUrl}`;
             // 更新显示的代理URL
             document.getElementById('proxyUrlDisplay').textContent = proxyUrl;
             // 如果endpoint为空，则返回基础URL，否则附加endpoint
@@ -280,7 +280,7 @@
         function copyProxyUrl() {
             const apiBaseUrl = document.getElementById('apiBaseUrl').value.trim();
             const cleanBaseUrl = apiBaseUrl.replace(/^https?:\/\//, '');
-            const proxyUrl = `${window.location.protocol}//${window.location.host}/${cleanBaseUrl}`;
+            const proxyUrl = `${window.location.protocol}//${window.location.host}/api/${cleanBaseUrl}`;
             navigator.clipboard.writeText(proxyUrl).then(() => {
                 alert('代理URL已复制到剪贴板！');
             }, () => {
